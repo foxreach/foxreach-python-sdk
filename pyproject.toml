@@ -1,0 +1,22 @@
+[project]
+name = "foxreach"
+version = "0.1.0"
+description = "Official Python SDK for the FoxReach cold email outreach API"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "FoxReach", email = "dev@foxreach.io" }]
+dependencies = [
+    "httpx>=0.25.0,<1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "respx>=0.20",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
