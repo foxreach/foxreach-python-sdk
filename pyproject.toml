@@ -6,9 +6,30 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [{ name = "FoxReach", email = "dev@foxreach.io" }]
+keywords = ["foxreach", "cold-email", "outreach", "email", "sdk", "api"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Communications :: Email",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
 dependencies = [
     "httpx>=0.25.0,<1.0",
 ]
+
+[project.urls]
+Homepage = "https://foxreach.io"
+Documentation = "https://docs.foxreach.io/sdks/python"
+Repository = "https://github.com/foxreach/foxreach-python-sdk"
+Changelog = "https://docs.foxreach.io/changelog"
 
 [project.optional-dependencies]
 dev = [
