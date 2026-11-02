@@ -80,6 +80,7 @@ class Campaign:
     sending_start_hour: int = 9
     sending_end_hour: int = 17
     daily_limit: int = 50
+    esp_matching: bool = False
     sent_today: int = 0
     total_leads: int = 0
     total_sent: int = 0
@@ -101,6 +102,7 @@ class CampaignCreate:
     sending_start_hour: Optional[int] = None
     sending_end_hour: Optional[int] = None
     daily_limit: Optional[int] = None
+    esp_matching: Optional[bool] = None
 
 
 @dataclass
@@ -111,6 +113,7 @@ class CampaignUpdate:
     sending_start_hour: Optional[int] = None
     sending_end_hour: Optional[int] = None
     daily_limit: Optional[int] = None
+    esp_matching: Optional[bool] = None
 
 
 # ---------------------------------------------------------------------------
@@ -122,29 +125,44 @@ class Sequence:
     id: str
     campaign_id: str
     step_number: int = 1
+    name: Optional[str] = None
     subject: Optional[str] = None
     body: str = ""
-    delay_days: int = 1
-    template_type: str = "email"
+    delay_days: int = 0
+    delay_hours: int = 0
+    send_only_if_no_reply: bool = True
+    send_as_html: bool = False
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
 
 @dataclass
 class SequenceCreate:
+    """Body of POST /campaigns/{id}/sequences.
+
+    ``subject`` and ``body`` are required by the API. The step number is
+    assigned by the server (next free step), so it cannot be set here.
+    Fields left as ``None`` are omitted and take the server default.
+    """
+
     body: str
-    subject: Optional[str] = None
+    subject: str
+    name: Optional[str] = None
     delay_days: int = 1
-    step_number: Optional[int] = None
-    template_type: str = "email"
+    delay_hours: Optional[int] = None
+    send_only_if_no_reply: Optional[bool] = None
+    send_as_html: Optional[bool] = None
 
 
 @dataclass
 class SequenceUpdate:
+    name: Optional[str] = None
     subject: Optional[str] = None
     body: Optional[str] = None
     delay_days: Optional[int] = None
-    step_number: Optional[int] = None
+    delay_hours: Optional[int] = None
+    send_only_if_no_reply: Optional[bool] = None
+    send_as_html: Optional[bool] = None
 
 
 # ---------------------------------------------------------------------------
@@ -157,7 +175,7 @@ class Template:
     name: str
     subject: Optional[str] = None
     body: str = ""
-    template_type: str = "email"
+    category: str = "email"
     send_as_html: bool = False
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
@@ -165,10 +183,13 @@ class Template:
 
 @dataclass
 class TemplateCreate:
+    """Body of POST /templates. ``category`` is omitted when ``None`` and the
+    server stores ``"email"``; other values include ``"reply_macro"``."""
+
     name: str
     body: str
     subject: Optional[str] = None
-    template_type: str = "email"
+    category: Optional[str] = None
     send_as_html: bool = False
 
 
@@ -177,7 +198,7 @@ class TemplateUpdate:
     name: Optional[str] = None
     subject: Optional[str] = None
     body: Optional[str] = None
-    template_type: Optional[str] = None
+    category: Optional[str] = None
     send_as_html: Optional[bool] = None
 
 
@@ -257,7 +278,8 @@ class OverviewStats:
     total_sent: int = 0
     total_replies: int = 0
     reply_rate: float = 0.0
-    account_health_avg: float = 0.0
+    # Average Health Score over accounts that have one; None when none are measured yet.
+    account_health_avg: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -295,6 +317,37 @@ class WebhookEvent:
 
 
 # ---------------------------------------------------------------------------
+# Webhooks
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class Webhook:
+    id: str
+    url: str
+    is_active: bool = True
+    events: List[str] = field(default_factory=list)
+    secret: Optional[str] = None
+    last_delivered_at: Optional[str] = None
+    consecutive_failures: int = 0
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+@dataclass
+class WebhookCreate:
+    url: str
+    events: List[str]
+    is_active: bool = True
+
+
+@dataclass
+class WebhookUpdate:
+    url: Optional[str] = None
+    events: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+
+# ---------------------------------------------------------------------------
 # Pagination Meta
 # ---------------------------------------------------------------------------
 
@@ -304,3 +357,213 @@ class PaginationMeta:
     page_size: int = 50
     total: int = 0
     total_pages: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Email Account Create / Update / Reconnect
+# ---------------------------------------------------------------------------
+
+@dataclass
+class EmailAccountCreate:
+    email: str
+    password: str
+    smtp_host: str
+    smtp_port: int
+    imap_host: str
+    imap_port: int
+    provider: str = "other"
+    display_name: Optional[str] = None
+    timezone: Optional[str] = None
+    daily_limit: Optional[int] = None
+    warmup_enabled: Optional[bool] = None
+    warmup_daily_limit: Optional[int] = None
+    warmup_ramp_up_days: Optional[int] = None
+
+
+@dataclass
+class EmailAccountUpdate:
+    display_name: Optional[str] = None
+    daily_limit: Optional[int] = None
+    timezone: Optional[str] = None
+    warmup_enabled: Optional[bool] = None
+    warmup_daily_limit: Optional[int] = None
+    warmup_ramp_up_days: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+@dataclass
+class ReconnectRequest:
+    password: str
+
+
+# ---------------------------------------------------------------------------
+# Health Payload
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class HealthPayload:
+    health_score: Optional[int] = None
+    health_basis: Optional[Dict[str, Any]] = None
+    bounce_7d: Optional[Dict[str, Any]] = None
+    warmup_enabled: Optional[bool] = None
+    warmup_progress: Optional[Dict[str, Any]] = None
+
+
+# ---------------------------------------------------------------------------
+# Warmup
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class WarmupPoolEntry:
+    account_id: str = ""
+    email: str = ""
+    display_name: Optional[str] = None
+    health_score: Optional[int] = None
+    health_basis: Optional[Dict[str, Any]] = None
+    warmup_enabled: bool = False
+    warmup_progress: Optional[Dict[str, Any]] = None
+    pool_stats: Optional[Dict[str, Any]] = None
+    tags: List[Dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class WarmupStats:
+    total_accounts: int = 0
+    active_warmup_accounts: int = 0
+    total_sent: int = 0
+    total_replied: int = 0
+    average_health_score: Optional[float] = None
+    health_measured_accounts: int = 0
+
+
+@dataclass(frozen=True)
+class WarmupLog:
+    id: str = ""
+    sender_email: str = ""
+    receiver_email: str = ""
+    subject: Optional[str] = None
+    status: Optional[str] = None
+    replied_at: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class WarmupTag:
+    id: str = ""
+    name: str = ""
+    color: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Tracking Domains
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class TrackingDomain:
+    id: str = ""
+    domain: str = ""
+    status: str = "pending"
+    cname_target: Optional[str] = None
+    cf_hostname_id: Optional[str] = None
+    failure_reason: Optional[str] = None
+    created_by: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+@dataclass
+class TrackingDomainCreate:
+    domain: str
+
+
+# ---------------------------------------------------------------------------
+# Managed Inboxes
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class ManagedInboxConfig:
+    platforms: List[Dict[str, Any]] = field(default_factory=list)
+    max_mailboxes_per_domain: int = 0
+    max_domains_per_order: int = 0
+    registration_years: int = 1
+    default_daily_limit: int = 0
+
+
+@dataclass(frozen=True)
+class ManagedOrder:
+    id: str = ""
+    status: str = ""
+    platform: Optional[str] = None
+    total_cents: int = 0
+    domains: List[Dict[str, Any]] = field(default_factory=list)
+    mailboxes: List[Dict[str, Any]] = field(default_factory=list)
+    created_at: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class ManagedMailbox:
+    id: str = ""
+    email: str = ""
+    domain: Optional[str] = None
+    platform: Optional[str] = None
+    order_id: Optional[str] = None
+    status: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Lead Finder
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class LeadFinderCredits:
+    balance: int = 0
+    expires_at: Optional[str] = None
+    monthly_included: int = 0
+    allowed_countries: List[str] = field(default_factory=list)
+    blocked_countries: List[str] = field(default_factory=list)
+    coverage: Optional[str] = None
+    credits_per_pack: int = 0
+    price_per_pack_cents: int = 0
+    search_pages_used_today: int = 0
+    search_pages_allowed_today: int = 0
+    search_pages_per_reveal: int = 0
+
+
+@dataclass(frozen=True)
+class RevealBatch:
+    batch_id: str = ""
+    reveals: List[Dict[str, Any]] = field(default_factory=list)
+    pending: int = 0
+    found: int = 0
+    not_found: int = 0
+    errors: int = 0
+    balance: int = 0
+
+
+@dataclass(frozen=True)
+class LeadFinderList:
+    id: str = ""
+    name: str = ""
+    kind: Optional[str] = None
+    item_count: int = 0
+    created_at: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class LeadFinderSavedSearch:
+    id: str = ""
+    name: str = ""
+    filters: Optional[Dict[str, Any]] = None
+    last_count: Optional[int] = None
+    created_at: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Lead Tags
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class LeadTag:
+    name: str = ""
+    count: int = 0

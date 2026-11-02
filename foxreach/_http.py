@@ -18,7 +18,7 @@ from ._exceptions import (
     ValidationError,
 )
 
-_VERSION = "0.1.0"
+from ._version import __version__ as _VERSION
 
 _CAMEL_TO_SNAKE_RE = re.compile(r"(?<=[a-z0-9])([A-Z])")
 _SNAKE_TO_CAMEL_RE = re.compile(r"_([a-z])")
@@ -32,9 +32,20 @@ def _to_camel(name: str) -> str:
     return _SNAKE_TO_CAMEL_RE.sub(lambda m: m.group(1).upper(), name)
 
 
+_OPAQUE_KEYS_SNAKE = frozenset({"custom_fields"})
+_OPAQUE_KEYS_CAMEL = frozenset({"customFields"})
+
+
 def _keys_to_snake(obj: Any) -> Any:
     if isinstance(obj, dict):
-        return {_to_snake(k): _keys_to_snake(v) for k, v in obj.items()}
+        result = {}
+        for k, v in obj.items():
+            new_key = _to_snake(k)
+            if k in _OPAQUE_KEYS_CAMEL:
+                result[new_key] = v
+            else:
+                result[new_key] = _keys_to_snake(v)
+        return result
     if isinstance(obj, list):
         return [_keys_to_snake(i) for i in obj]
     return obj
@@ -42,7 +53,14 @@ def _keys_to_snake(obj: Any) -> Any:
 
 def _keys_to_camel(obj: Any) -> Any:
     if isinstance(obj, dict):
-        return {_to_camel(k): _keys_to_camel(v) for k, v in obj.items()}
+        result = {}
+        for k, v in obj.items():
+            new_key = _to_camel(k)
+            if k in _OPAQUE_KEYS_SNAKE:
+                result[new_key] = v
+            else:
+                result[new_key] = _keys_to_camel(v)
+        return result
     if isinstance(obj, list):
         return [_keys_to_camel(i) for i in obj]
     return obj

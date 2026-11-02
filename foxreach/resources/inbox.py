@@ -67,14 +67,62 @@ class InboxResource:
         }
         return _fetch_page(self._http, "/inbox/threads", params, _make_thread)
 
-    def get(self, reply_id: str) -> Thread:
-        result = self._http.request("GET", f"/inbox/{reply_id}")
+    def get(self, reply_id: str, *, mark_read: bool = False) -> Thread:
+        """Get a thread. Reading does not mark it read unless ``mark_read=True``."""
+        params = {"markRead": True} if mark_read else None
+        result = self._http.request("GET", f"/inbox/threads/{reply_id}", params=params)
         return _make_thread(_unwrap(result))
 
     def update(self, reply_id: str, data: ThreadUpdate) -> Thread:
         body = {k: v for k, v in asdict(data).items() if v is not None}
-        result = self._http.request("PATCH", f"/inbox/{reply_id}", json_body=body)
+        result = self._http.request("PATCH", f"/inbox/threads/{reply_id}", json_body=body)
         return _make_thread(_unwrap(result))
+
+    def delete(self, reply_id: str) -> None:
+        """Delete an inbox thread by ID. Requires write scope."""
+        self._http.request("DELETE", f"/inbox/threads/{reply_id}")
+
+    def get_conversation(self, reply_id: str) -> dict:
+        result = self._http.request("GET", f"/inbox/threads/{reply_id}/conversation")
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    def send_reply(self, reply_id: str, body: str, *, subject: Optional[str] = None) -> dict:
+        json_body: Dict[str, Any] = {"body": body}
+        if subject:
+            json_body["subject"] = subject
+        result = self._http.request("POST", f"/inbox/threads/{reply_id}/reply", json_body=json_body)
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    def stats(self) -> dict:
+        result = self._http.request("GET", "/inbox/stats")
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    def categorize_stats(
+        self,
+        *,
+        campaign_id: Optional[str] = None,
+        sequence_step: Optional[int] = None,
+        variant_id: Optional[str] = None,
+        group_by: Optional[str] = None,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+    ) -> dict:
+        """Per-variant/step/day reply categorization stats for the autoresearch loop."""
+        params: Dict[str, Any] = {}
+        if campaign_id:
+            params["campaignId"] = campaign_id
+        if sequence_step is not None:
+            params["sequenceStep"] = sequence_step
+        if variant_id:
+            params["variantId"] = variant_id
+        if group_by:
+            params["groupBy"] = group_by
+        if from_date:
+            params["fromDate"] = from_date
+        if to_date:
+            params["toDate"] = to_date
+        result = self._http.request("GET", "/inbox/categorize-stats", params=params)
+        return _unwrap(result) if isinstance(result, dict) else {}
 
 
 class AsyncInboxResource:
@@ -105,11 +153,59 @@ class AsyncInboxResource:
         }
         return await _async_fetch_page(self._http, "/inbox/threads", params, _make_thread)
 
-    async def get(self, reply_id: str) -> Thread:
-        result = await self._http.request("GET", f"/inbox/{reply_id}")
+    async def get(self, reply_id: str, *, mark_read: bool = False) -> Thread:
+        """Get a thread. Reading does not mark it read unless ``mark_read=True``."""
+        params = {"markRead": True} if mark_read else None
+        result = await self._http.request("GET", f"/inbox/threads/{reply_id}", params=params)
         return _make_thread(_unwrap(result))
 
     async def update(self, reply_id: str, data: ThreadUpdate) -> Thread:
         body = {k: v for k, v in asdict(data).items() if v is not None}
-        result = await self._http.request("PATCH", f"/inbox/{reply_id}", json_body=body)
+        result = await self._http.request("PATCH", f"/inbox/threads/{reply_id}", json_body=body)
         return _make_thread(_unwrap(result))
+
+    async def delete(self, reply_id: str) -> None:
+        """Delete an inbox thread by ID. Requires write scope."""
+        await self._http.request("DELETE", f"/inbox/threads/{reply_id}")
+
+    async def get_conversation(self, reply_id: str) -> dict:
+        result = await self._http.request("GET", f"/inbox/threads/{reply_id}/conversation")
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    async def send_reply(self, reply_id: str, body: str, *, subject: Optional[str] = None) -> dict:
+        json_body: Dict[str, Any] = {"body": body}
+        if subject:
+            json_body["subject"] = subject
+        result = await self._http.request("POST", f"/inbox/threads/{reply_id}/reply", json_body=json_body)
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    async def stats(self) -> dict:
+        result = await self._http.request("GET", "/inbox/stats")
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    async def categorize_stats(
+        self,
+        *,
+        campaign_id: Optional[str] = None,
+        sequence_step: Optional[int] = None,
+        variant_id: Optional[str] = None,
+        group_by: Optional[str] = None,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+    ) -> dict:
+        """Per-variant/step/day reply categorization stats for the autoresearch loop."""
+        params: Dict[str, Any] = {}
+        if campaign_id:
+            params["campaignId"] = campaign_id
+        if sequence_step is not None:
+            params["sequenceStep"] = sequence_step
+        if variant_id:
+            params["variantId"] = variant_id
+        if group_by:
+            params["groupBy"] = group_by
+        if from_date:
+            params["fromDate"] = from_date
+        if to_date:
+            params["toDate"] = to_date
+        result = await self._http.request("GET", "/inbox/categorize-stats", params=params)
+        return _unwrap(result) if isinstance(result, dict) else {}

@@ -24,7 +24,7 @@ def _make_overview(data: dict) -> OverviewStats:
         total_sent=data.get("total_sent", 0),
         total_replies=data.get("total_replies", 0),
         reply_rate=data.get("reply_rate", 0.0),
-        account_health_avg=data.get("account_health_avg", 0.0),
+        account_health_avg=data.get("account_health_avg"),
     )
 
 

@@ -21,7 +21,7 @@ def _make_template(data: dict) -> Template:
         name=data.get("name", ""),
         subject=data.get("subject"),
         body=data.get("body", ""),
-        template_type=data.get("template_type", "email"),
+        category=data.get("category", "email"),
         send_as_html=data.get("send_as_html", False),
         created_at=data.get("created_at"),
         updated_at=data.get("updated_at"),

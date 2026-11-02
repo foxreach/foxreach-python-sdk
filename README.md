@@ -51,6 +51,7 @@ async with AsyncFoxReach(api_key="otr_your_api_key") as client:
 
 ```python
 client.leads.list(page=1, page_size=50, search="...", status="active", tags="...")
+client.leads.list(email="jane@example.com")  # exact, case-insensitive match
 client.leads.get("cld_...")
 client.leads.create(LeadCreate(email="..."))
 client.leads.update("cld_...", LeadUpdate(company="New Co"))
@@ -75,7 +76,7 @@ client.campaigns.add_accounts("cmp_...", ["acc_1"])
 
 ```python
 client.campaigns.sequences.list("cmp_...")
-client.campaigns.sequences.create("cmp_...", SequenceCreate(body="Hi {{firstName}}"))
+client.campaigns.sequences.create("cmp_...", SequenceCreate(subject="Quick question", body="Hi {{firstName}}"))
 client.campaigns.sequences.update("cmp_...", "seq_...", SequenceUpdate(delay_days=3))
 client.campaigns.sequences.delete("cmp_...", "seq_...")
 ```
@@ -85,7 +86,7 @@ client.campaigns.sequences.delete("cmp_...", "seq_...")
 ```python
 client.templates.list()
 client.templates.get("tpl_...")
-client.templates.create(TemplateCreate(name="Follow-up", body="Hi {{firstName}}"))
+client.templates.create(TemplateCreate(name="Follow-up", body="Hi {{firstName}}", category="email"))
 client.templates.update("tpl_...", TemplateUpdate(name="New name"))
 client.templates.delete("tpl_...")
 ```
@@ -102,7 +103,8 @@ client.email_accounts.delete("acc_...")
 
 ```python
 client.inbox.list_threads(category="interested", is_read=False)
-client.inbox.get("rpl_...")
+client.inbox.get("rpl_...")                  # does not mark the thread read
+client.inbox.get("rpl_...", mark_read=True)  # marks it read
 client.inbox.update("rpl_...", ThreadUpdate(is_read=True))
 ```
 

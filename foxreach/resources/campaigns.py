@@ -25,6 +25,7 @@ def _make_campaign(data: dict) -> Campaign:
         sending_start_hour=data.get("sending_start_hour", 9),
         sending_end_hour=data.get("sending_end_hour", 17),
         daily_limit=data.get("daily_limit", 50),
+        esp_matching=data.get("esp_matching", False),
         sent_today=data.get("sent_today", 0),
         total_leads=data.get("total_leads", 0),
         total_sent=data.get("total_sent", 0),
@@ -44,10 +45,13 @@ def _make_sequence(data: dict) -> Sequence:
         id=data.get("id", ""),
         campaign_id=data.get("campaign_id", ""),
         step_number=data.get("step_number", 1),
+        name=data.get("name"),
         subject=data.get("subject"),
         body=data.get("body", ""),
-        delay_days=data.get("delay_days", 1),
-        template_type=data.get("template_type", "email"),
+        delay_days=data.get("delay_days", 0),
+        delay_hours=data.get("delay_hours", 0),
+        send_only_if_no_reply=data.get("send_only_if_no_reply", True),
+        send_as_html=data.get("send_as_html", False),
         created_at=data.get("created_at"),
         updated_at=data.get("updated_at"),
     )
@@ -185,6 +189,43 @@ class CampaignsResource:
         )
         return _unwrap(result) if isinstance(result, dict) else {}
 
+    def resume(self, campaign_id: str) -> Campaign:
+        result = self._http.request("POST", f"/campaigns/{campaign_id}/resume")
+        return _make_campaign(_unwrap(result))
+
+    def remove_lead(self, campaign_id: str, lead_id: str) -> Dict[str, Any]:
+        result = self._http.request("DELETE", f"/campaigns/{campaign_id}/leads/{lead_id}")
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    def remove_account(self, campaign_id: str, account_id: str) -> Dict[str, Any]:
+        result = self._http.request("DELETE", f"/campaigns/{campaign_id}/accounts/{account_id}")
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    def list_leads(
+        self,
+        campaign_id: str,
+        *,
+        page: int = 1,
+        page_size: int = 50,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        params: Dict[str, Any] = {"page": page, "pageSize": page_size}
+        if status is not None:
+            params["status"] = status
+        if search is not None:
+            params["search"] = search
+        result = self._http.request("GET", f"/campaigns/{campaign_id}/leads", params=params)
+        return result if isinstance(result, dict) else {}
+
+    def list_accounts(self, campaign_id: str) -> Dict[str, Any]:
+        result = self._http.request("GET", f"/campaigns/{campaign_id}/accounts")
+        return result if isinstance(result, dict) else {}
+
+    def get_esp_mix(self, campaign_id: str) -> Dict[str, Any]:
+        result = self._http.request("GET", f"/campaigns/{campaign_id}/esp-mix")
+        return result if isinstance(result, dict) else {}
+
 
 class AsyncCampaignsResource:
     def __init__(self, http: AsyncHttpClient) -> None:
@@ -245,3 +286,40 @@ class AsyncCampaignsResource:
             json_body={"account_ids": account_ids},
         )
         return _unwrap(result) if isinstance(result, dict) else {}
+
+    async def resume(self, campaign_id: str) -> Campaign:
+        result = await self._http.request("POST", f"/campaigns/{campaign_id}/resume")
+        return _make_campaign(_unwrap(result))
+
+    async def remove_lead(self, campaign_id: str, lead_id: str) -> Dict[str, Any]:
+        result = await self._http.request("DELETE", f"/campaigns/{campaign_id}/leads/{lead_id}")
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    async def remove_account(self, campaign_id: str, account_id: str) -> Dict[str, Any]:
+        result = await self._http.request("DELETE", f"/campaigns/{campaign_id}/accounts/{account_id}")
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    async def list_leads(
+        self,
+        campaign_id: str,
+        *,
+        page: int = 1,
+        page_size: int = 50,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        params: Dict[str, Any] = {"page": page, "pageSize": page_size}
+        if status is not None:
+            params["status"] = status
+        if search is not None:
+            params["search"] = search
+        result = await self._http.request("GET", f"/campaigns/{campaign_id}/leads", params=params)
+        return result if isinstance(result, dict) else {}
+
+    async def list_accounts(self, campaign_id: str) -> Dict[str, Any]:
+        result = await self._http.request("GET", f"/campaigns/{campaign_id}/accounts")
+        return result if isinstance(result, dict) else {}
+
+    async def get_esp_mix(self, campaign_id: str) -> Dict[str, Any]:
+        result = await self._http.request("GET", f"/campaigns/{campaign_id}/esp-mix")
+        return result if isinstance(result, dict) else {}
