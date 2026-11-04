@@ -111,17 +111,18 @@ class HttpClient:
         base_url: str,
         timeout: float,
         max_retries: int,
+        workspace_id: Optional[str] = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._max_retries = max_retries
-        self._client = httpx.Client(
-            headers={
-                "X-API-Key": api_key,
-                "Content-Type": "application/json",
-                "User-Agent": f"foxreach-python/{_VERSION}",
-            },
-            timeout=timeout,
-        )
+        headers = {
+            "X-API-Key": api_key,
+            "Content-Type": "application/json",
+            "User-Agent": f"foxreach-python/{_VERSION}",
+        }
+        if workspace_id is not None:
+            headers["X-Workspace-Id"] = workspace_id
+        self._client = httpx.Client(headers=headers, timeout=timeout)
 
     def close(self) -> None:
         self._client.close()
@@ -178,6 +179,26 @@ class HttpClient:
             raise last_exc
         return None
 
+    def request_text(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Like request(), for endpoints that return a text body such as CSV."""
+        clean_params = {k: v for k, v in (params or {}).items() if v is not None}
+        try:
+            resp = self._client.request(
+                method, f"{self._base_url}{path}", params=clean_params or None,
+            )
+        except httpx.ConnectError as exc:
+            raise ConnectionError(f"Connection failed: {exc}") from exc
+        except httpx.TimeoutException as exc:
+            raise ConnectionError(f"Request timed out: {exc}") from exc
+        _raise_for_status(resp)
+        return resp.text
+
     def request_paginated(
         self,
         path: str,
@@ -205,17 +226,18 @@ class AsyncHttpClient:
         base_url: str,
         timeout: float,
         max_retries: int,
+        workspace_id: Optional[str] = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._max_retries = max_retries
-        self._client = httpx.AsyncClient(
-            headers={
-                "X-API-Key": api_key,
-                "Content-Type": "application/json",
-                "User-Agent": f"foxreach-python/{_VERSION}",
-            },
-            timeout=timeout,
-        )
+        headers = {
+            "X-API-Key": api_key,
+            "Content-Type": "application/json",
+            "User-Agent": f"foxreach-python/{_VERSION}",
+        }
+        if workspace_id is not None:
+            headers["X-Workspace-Id"] = workspace_id
+        self._client = httpx.AsyncClient(headers=headers, timeout=timeout)
 
     async def close(self) -> None:
         await self._client.aclose()
@@ -268,6 +290,26 @@ class AsyncHttpClient:
         if last_exc:
             raise last_exc
         return None
+
+    async def request_text(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Like request(), for endpoints that return a text body such as CSV."""
+        clean_params = {k: v for k, v in (params or {}).items() if v is not None}
+        try:
+            resp = await self._client.request(
+                method, f"{self._base_url}{path}", params=clean_params or None,
+            )
+        except httpx.ConnectError as exc:
+            raise ConnectionError(f"Connection failed: {exc}") from exc
+        except httpx.TimeoutException as exc:
+            raise ConnectionError(f"Request timed out: {exc}") from exc
+        _raise_for_status(resp)
+        return resp.text
 
     async def request_paginated(
         self,

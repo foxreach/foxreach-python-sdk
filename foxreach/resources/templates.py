@@ -64,6 +64,22 @@ class TemplatesResource:
     def delete(self, template_id: str) -> None:
         self._http.request("DELETE", f"/templates/{template_id}")
 
+    def publish(self, template_id: Any, share_description: Any, share_category: Any) -> Any:
+        """Publish a template: readable by anyone with its share link at once, listed in the gallery after approval. Requires write scope."""
+        body = {k: v for k, v in {"share_description": share_description, "share_category": share_category}.items() if v is not None}
+        result = self._http.request("POST", f"/templates/{template_id}/publish", json_body=body)
+        return _pa3_data(result)
+
+    def unpublish(self, template_id: Any) -> Any:
+        """Stop sharing a template and invalidate its link. Requires write scope."""
+        result = self._http.request("DELETE", f"/templates/{template_id}/publish")
+        return _pa3_data(result)
+
+    def clone(self, slug: Any) -> Any:
+        """Copy a gallery template into this workspace. Requires write scope."""
+        result = self._http.request("POST", f"/templates/clone/{slug}", json_body={})
+        return _pa3_data(result)
+
 
 class AsyncTemplatesResource:
     def __init__(self, http: AsyncHttpClient) -> None:
@@ -94,3 +110,25 @@ class AsyncTemplatesResource:
 
     async def delete(self, template_id: str) -> None:
         await self._http.request("DELETE", f"/templates/{template_id}")
+
+    async def publish(self, template_id: Any, share_description: Any, share_category: Any) -> Any:
+        """Publish a template: readable by anyone with its share link at once, listed in the gallery after approval. Requires write scope."""
+        body = {k: v for k, v in {"share_description": share_description, "share_category": share_category}.items() if v is not None}
+        result = await self._http.request("POST", f"/templates/{template_id}/publish", json_body=body)
+        return _pa3_data(result)
+
+    async def unpublish(self, template_id: Any) -> Any:
+        """Stop sharing a template and invalidate its link. Requires write scope."""
+        result = await self._http.request("DELETE", f"/templates/{template_id}/publish")
+        return _pa3_data(result)
+
+    async def clone(self, slug: Any) -> Any:
+        """Copy a gallery template into this workspace. Requires write scope."""
+        result = await self._http.request("POST", f"/templates/clone/{slug}", json_body={})
+        return _pa3_data(result)
+
+
+def _pa3_data(result: Any) -> Any:
+    if isinstance(result, dict) and "data" in result and "meta" not in result:
+        return result["data"]
+    return result

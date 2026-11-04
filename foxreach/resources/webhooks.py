@@ -24,6 +24,9 @@ def _make_webhook(data: dict) -> Webhook:
         secret=data.get("secret"),
         last_delivered_at=data.get("last_delivered_at"),
         consecutive_failures=data.get("consecutive_failures", 0),
+        reply_categories=data.get("reply_categories"),
+        paused_at=data.get("paused_at"),
+        paused_reason=data.get("paused_reason"),
         created_at=data.get("created_at"),
         updated_at=data.get("updated_at"),
     )
@@ -71,6 +74,28 @@ class WebhooksResource:
     def delete(self, webhook_id: str) -> None:
         self._http.request("DELETE", f"/webhooks/{webhook_id}")
 
+    def resume(self, webhook_id: str) -> Webhook:
+        """Turn a webhook that was paused after 10 failed deliveries in a row back on."""
+        result = self._http.request("POST", f"/webhooks/{webhook_id}/resume")
+        return _make_webhook(_unwrap(result))
+
+    def test(self, webhook_id: str) -> dict:
+        """Send a signed ``webhook.test`` event now. Returns ``success``, ``status_code`` and
+        ``duration_ms`` (or ``error`` and ``error_code``); never the endpoint's reply."""
+        return _unwrap(self._http.request("POST", f"/webhooks/{webhook_id}/test")) or {}
+
+    def deliveries(
+        self,
+        webhook_id: str,
+        *,
+        status: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> PaginatedResponse[dict]:
+        """Delivery attempts for one webhook, newest first."""
+        params: Dict[str, Any] = {"page": page, "pageSize": page_size, "status": status}
+        return _fetch_page(self._http, f"/webhooks/{webhook_id}/deliveries", params, lambda d: d)
+
 
 class AsyncWebhooksResource:
     def __init__(self, http: AsyncHttpClient) -> None:
@@ -107,3 +132,25 @@ class AsyncWebhooksResource:
 
     async def delete(self, webhook_id: str) -> None:
         await self._http.request("DELETE", f"/webhooks/{webhook_id}")
+
+    async def resume(self, webhook_id: str) -> Webhook:
+        """Async variant of `WebhooksResource.resume`."""
+        result = await self._http.request("POST", f"/webhooks/{webhook_id}/resume")
+        return _make_webhook(_unwrap(result))
+
+    async def test(self, webhook_id: str) -> dict:
+        """Send a signed ``webhook.test`` event now. Returns ``success``, ``status_code`` and
+        ``duration_ms`` (or ``error`` and ``error_code``); never the endpoint's reply."""
+        return _unwrap(await self._http.request("POST", f"/webhooks/{webhook_id}/test")) or {}
+
+    async def deliveries(
+        self,
+        webhook_id: str,
+        *,
+        status: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> AsyncPaginatedResponse[dict]:
+        """Delivery attempts for one webhook, newest first."""
+        params: Dict[str, Any] = {"page": page, "pageSize": page_size, "status": status}
+        return await _async_fetch_page(self._http, f"/webhooks/{webhook_id}/deliveries", params, lambda d: d)

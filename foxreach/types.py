@@ -24,8 +24,21 @@ class Lead:
     tags: List[str] = field(default_factory=list)
     status: str = "active"
     source: Optional[str] = None
+    interest_status: Optional[str] = None
+    interest_status_source: Optional[str] = None
+    interest_status_updated_at: Optional[str] = None
+    labels: List["LeadLabel"] = field(default_factory=list)
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+
+
+@dataclass
+class LeadLabel:
+    id: str
+    name: str
+    color: str = "neutral"
+    meaning: str = "neutral"
+    created_at: Optional[str] = None
 
 
 @dataclass
@@ -55,6 +68,7 @@ class LeadUpdate:
     custom_fields: Optional[Dict[str, Any]] = None
     tags: Optional[List[str]] = None
     notes: Optional[str] = None
+    interest_status: Optional[str] = None
 
 
 @dataclass
@@ -163,6 +177,55 @@ class SequenceUpdate:
     delay_hours: Optional[int] = None
     send_only_if_no_reply: Optional[bool] = None
     send_as_html: Optional[bool] = None
+
+
+@dataclass(frozen=True)
+class SequenceVariant:
+    """One A/B variant of a sequence step."""
+
+    id: str
+    sequence_id: str
+    label: str
+    subject: str = ""
+    body: str = ""
+    weight: int = 1
+    send_as_html: bool = False
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+@dataclass
+class VariantCreate:
+    """Body of POST /campaigns/{id}/sequences/{sid}/variants."""
+
+    subject: str
+    body: str
+    label: str = "A"
+    weight: int = 1
+    send_as_html: bool = False
+
+
+@dataclass
+class VariantUpdate:
+    label: Optional[str] = None
+    subject: Optional[str] = None
+    body: Optional[str] = None
+    weight: Optional[int] = None
+    send_as_html: Optional[bool] = None
+
+
+@dataclass(frozen=True)
+class VariantStats:
+    """Per-variant results of one step. Rates are percentages."""
+
+    variant_id: str
+    label: str
+    sent: int = 0
+    opened: int = 0
+    replied: int = 0
+    bounced: int = 0
+    open_rate: float = 0.0
+    reply_rate: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -329,6 +392,9 @@ class Webhook:
     secret: Optional[str] = None
     last_delivered_at: Optional[str] = None
     consecutive_failures: int = 0
+    reply_categories: Optional[List[str]] = None
+    paused_at: Optional[str] = None
+    paused_reason: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
@@ -338,6 +404,7 @@ class WebhookCreate:
     url: str
     events: List[str]
     is_active: bool = True
+    reply_categories: Optional[List[str]] = None
 
 
 @dataclass
@@ -345,6 +412,7 @@ class WebhookUpdate:
     url: Optional[str] = None
     events: Optional[List[str]] = None
     is_active: Optional[bool] = None
+    reply_categories: Optional[List[str]] = None
 
 
 # ---------------------------------------------------------------------------
@@ -477,6 +545,29 @@ class TrackingDomainCreate:
 
 
 # ---------------------------------------------------------------------------
+# Block list
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class BlockListEntry:
+    id: str = ""
+    kind: str = "email"  # email | domain
+    value: str = ""
+    source: str = "manual"  # manual | import | unsubscribe | api
+    note: Optional[str] = None
+    created_by: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class BlockListBulkResult:
+    created: int = 0
+    duplicates: int = 0
+    invalid: int = 0
+    invalid_details: List[Dict[str, Any]] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
 # Managed Inboxes
 # ---------------------------------------------------------------------------
 
@@ -567,3 +658,43 @@ class LeadFinderSavedSearch:
 class LeadTag:
     name: str = ""
     count: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Jobs
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class Job:
+    id: str
+    type: str
+    status: str
+    progress: int = 0
+    total_items: int = 0
+    completed_items: int = 0
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Me
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class Me:
+    """The calling API key, its workspace, plan, per-class rate limits and credits.
+
+    The nested dicts use snake_case keys like the rest of the SDK
+    (``plan["limits"]["monthly_email_limit"]``, ``credits["lead_finder"]["balance"]``).
+    """
+
+    key: Dict[str, Any] = field(default_factory=dict)
+    workspace: Dict[str, Any] = field(default_factory=dict)
+    plan: Dict[str, Any] = field(default_factory=dict)
+    rate_limit: Dict[str, Any] = field(default_factory=dict)
+    credits: Dict[str, Any] = field(default_factory=dict)

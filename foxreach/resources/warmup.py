@@ -103,6 +103,33 @@ class WarmupResource:
             entries = []
         return [_make_tag(e) for e in entries]
 
+    def create_tag(self, name: Any, *, color: Any = None) -> Any:
+        """Create a warmup pool tag. Requires write scope."""
+        body = {k: v for k, v in {"name": name, "color": color}.items() if v is not None}
+        result = self._http.request("POST", "/warmup/tags", json_body=body)
+        return _pa3_data(result)
+
+    def update_tag(self, tag_id: Any, *, name: Any = None, color: Any = None) -> Any:
+        """Rename or recolor a warmup pool tag. Requires write scope."""
+        body = {k: v for k, v in {"name": name, "color": color}.items() if v is not None}
+        result = self._http.request("PATCH", f"/warmup/tags/{tag_id}", json_body=body)
+        return _pa3_data(result)
+
+    def delete_tag(self, tag_id: Any) -> Any:
+        """Delete a warmup pool tag; it comes off every account. Requires write scope."""
+        result = self._http.request("DELETE", f"/warmup/tags/{tag_id}")
+        return _pa3_data(result)
+
+    def assign_tag(self, account_id: Any, tag_id: Any) -> Any:
+        """Put a tag on an email account. Safe to repeat. Requires write scope."""
+        result = self._http.request("POST", f"/warmup/pool/{account_id}/tags/{tag_id}")
+        return _pa3_data(result)
+
+    def unassign_tag(self, account_id: Any, tag_id: Any) -> Any:
+        """Take a tag off an email account. Safe to repeat. Requires write scope."""
+        result = self._http.request("DELETE", f"/warmup/pool/{account_id}/tags/{tag_id}")
+        return _pa3_data(result)
+
 
 class AsyncWarmupResource:
     def __init__(self, http: AsyncHttpClient) -> None:
@@ -140,3 +167,36 @@ class AsyncWarmupResource:
         if not isinstance(entries, list):
             entries = []
         return [_make_tag(e) for e in entries]
+
+    async def create_tag(self, name: Any, *, color: Any = None) -> Any:
+        """Create a warmup pool tag. Requires write scope."""
+        body = {k: v for k, v in {"name": name, "color": color}.items() if v is not None}
+        result = await self._http.request("POST", "/warmup/tags", json_body=body)
+        return _pa3_data(result)
+
+    async def update_tag(self, tag_id: Any, *, name: Any = None, color: Any = None) -> Any:
+        """Rename or recolor a warmup pool tag. Requires write scope."""
+        body = {k: v for k, v in {"name": name, "color": color}.items() if v is not None}
+        result = await self._http.request("PATCH", f"/warmup/tags/{tag_id}", json_body=body)
+        return _pa3_data(result)
+
+    async def delete_tag(self, tag_id: Any) -> Any:
+        """Delete a warmup pool tag; it comes off every account. Requires write scope."""
+        result = await self._http.request("DELETE", f"/warmup/tags/{tag_id}")
+        return _pa3_data(result)
+
+    async def assign_tag(self, account_id: Any, tag_id: Any) -> Any:
+        """Put a tag on an email account. Safe to repeat. Requires write scope."""
+        result = await self._http.request("POST", f"/warmup/pool/{account_id}/tags/{tag_id}")
+        return _pa3_data(result)
+
+    async def unassign_tag(self, account_id: Any, tag_id: Any) -> Any:
+        """Take a tag off an email account. Safe to repeat. Requires write scope."""
+        result = await self._http.request("DELETE", f"/warmup/pool/{account_id}/tags/{tag_id}")
+        return _pa3_data(result)
+
+
+def _pa3_data(result: Any) -> Any:
+    if isinstance(result, dict) and "data" in result and "meta" not in result:
+        return result["data"]
+    return result

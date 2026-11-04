@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from ..types import Thread, ThreadUpdate
 from .._pagination import (
@@ -39,9 +39,98 @@ def _unwrap(result: Any) -> Any:
     return result
 
 
+def _bulk_body(ids: List[str], is_read: Optional[bool], is_starred: Optional[bool], category: Optional[str]) -> dict:
+    body: Dict[str, Any] = {"ids": ids}
+    if is_read is not None:
+        body["isRead"] = is_read
+    if is_starred is not None:
+        body["isStarred"] = is_starred
+    if category is not None:
+        body["category"] = category
+    return body
+
+
+class DraftsResource:
+    """AI reply drafts on inbox threads (``client.inbox.drafts``)."""
+
+    def __init__(self, http: HttpClient) -> None:
+        self._http = http
+
+    def list(
+        self,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+        campaign_id: Optional[str] = None,
+        category: Optional[str] = None,
+        account_id: Optional[str] = None,
+    ) -> PaginatedResponse[dict]:
+        params: Dict[str, Any] = {
+            "page": page, "pageSize": page_size, "campaignId": campaign_id,
+            "category": category, "accountId": account_id,
+        }
+        return _fetch_page(self._http, "/inbox/drafts", params, lambda d: d)
+
+    def get(self, reply_id: str) -> dict:
+        return _unwrap(self._http.request("GET", f"/inbox/threads/{reply_id}/draft")) or {}
+
+    def update(self, reply_id: str, draft_reply: str) -> dict:
+        return _unwrap(self._http.request(
+            "PATCH", f"/inbox/threads/{reply_id}/draft", json_body={"draftReply": draft_reply}
+        )) or {}
+
+    def send(self, reply_id: str) -> dict:
+        """Send the stored draft as a real email. Repeat calls send nothing."""
+        return _unwrap(self._http.request("POST", f"/inbox/threads/{reply_id}/draft/send")) or {}
+
+    def regenerate(self, reply_id: str) -> dict:
+        return _unwrap(self._http.request("POST", f"/inbox/threads/{reply_id}/draft/regenerate")) or {}
+
+    def dismiss(self, reply_id: str) -> dict:
+        return _unwrap(self._http.request("POST", f"/inbox/threads/{reply_id}/draft/dismiss")) or {}
+
+
+class AsyncDraftsResource:
+    def __init__(self, http: AsyncHttpClient) -> None:
+        self._http = http
+
+    async def list(
+        self,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+        campaign_id: Optional[str] = None,
+        category: Optional[str] = None,
+        account_id: Optional[str] = None,
+    ) -> AsyncPaginatedResponse[dict]:
+        params: Dict[str, Any] = {
+            "page": page, "pageSize": page_size, "campaignId": campaign_id,
+            "category": category, "accountId": account_id,
+        }
+        return await _async_fetch_page(self._http, "/inbox/drafts", params, lambda d: d)
+
+    async def get(self, reply_id: str) -> dict:
+        return _unwrap(await self._http.request("GET", f"/inbox/threads/{reply_id}/draft")) or {}
+
+    async def update(self, reply_id: str, draft_reply: str) -> dict:
+        return _unwrap(await self._http.request(
+            "PATCH", f"/inbox/threads/{reply_id}/draft", json_body={"draftReply": draft_reply}
+        )) or {}
+
+    async def send(self, reply_id: str) -> dict:
+        return _unwrap(await self._http.request("POST", f"/inbox/threads/{reply_id}/draft/send")) or {}
+
+    async def regenerate(self, reply_id: str) -> dict:
+        return _unwrap(await self._http.request("POST", f"/inbox/threads/{reply_id}/draft/regenerate")) or {}
+
+    async def dismiss(self, reply_id: str) -> dict:
+        return _unwrap(await self._http.request("POST", f"/inbox/threads/{reply_id}/draft/dismiss")) or {}
+
+
 class InboxResource:
     def __init__(self, http: HttpClient) -> None:
         self._http = http
+        self.drafts = DraftsResource(http)
 
     def list_threads(
         self,
@@ -124,10 +213,64 @@ class InboxResource:
         result = self._http.request("GET", "/inbox/categorize-stats", params=params)
         return _unwrap(result) if isinstance(result, dict) else {}
 
+    def mark_read(self, reply_id: str) -> dict:
+        """Mark one thread as read. Requires write scope."""
+        return _unwrap(self._http.request("POST", f"/inbox/threads/{reply_id}/mark-read")) or {}
+
+    def mark_all_read(self, *, category: Optional[str] = None) -> dict:
+        """Mark every unread thread read, optionally only one category. Returns ``{"updated": n}``."""
+        body = {"category": category} if category else {}
+        return _unwrap(self._http.request("POST", "/inbox/mark-all-read", json_body=body)) or {}
+
+    def bulk_update(
+        self,
+        ids: List[str],
+        *,
+        is_read: Optional[bool] = None,
+        is_starred: Optional[bool] = None,
+        category: Optional[str] = None,
+    ) -> dict:
+        """Update up to 100 threads at once. Returns ``{"updated": n}``."""
+        body = _bulk_body(ids, is_read, is_starred, category)
+        return _unwrap(self._http.request("POST", "/inbox/threads/bulk-update", json_body=body)) or {}
+
+    def bulk_delete(self, ids: List[str]) -> dict:
+        """Delete up to 100 threads at once. Returns ``{"deleted": n}``."""
+        return _unwrap(self._http.request("POST", "/inbox/threads/bulk-delete", json_body={"ids": ids})) or {}
+
+    def list_notes(self, reply_id: str) -> list:
+        return _unwrap(self._http.request("GET", f"/inbox/threads/{reply_id}/notes")) or []
+
+    def add_note(self, reply_id: str, content: str) -> dict:
+        """Add an internal note. It is credited to the user who owns the API key."""
+        return _unwrap(self._http.request(
+            "POST", f"/inbox/threads/{reply_id}/notes", json_body={"content": content}
+        )) or {}
+
+    def delete_note(self, note_id: str) -> dict:
+        return _unwrap(self._http.request("DELETE", f"/inbox/notes/{note_id}")) or {}
+
+    def list_sent(
+        self,
+        *,
+        page: int = 1,
+        page_size: int = 50,
+        campaign_id: Optional[str] = None,
+        account_id: Optional[str] = None,
+        email_type: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> PaginatedResponse[dict]:
+        params: Dict[str, Any] = {
+            "page": page, "pageSize": page_size, "campaignId": campaign_id,
+            "accountId": account_id, "emailType": email_type, "search": search,
+        }
+        return _fetch_page(self._http, "/inbox/sent", params, lambda d: d)
+
 
 class AsyncInboxResource:
     def __init__(self, http: AsyncHttpClient) -> None:
         self._http = http
+        self.drafts = AsyncDraftsResource(http)
 
     async def list_threads(
         self,
@@ -209,3 +352,56 @@ class AsyncInboxResource:
             params["toDate"] = to_date
         result = await self._http.request("GET", "/inbox/categorize-stats", params=params)
         return _unwrap(result) if isinstance(result, dict) else {}
+
+    async def mark_read(self, reply_id: str) -> dict:
+        """Mark one thread as read. Requires write scope."""
+        return _unwrap(await self._http.request("POST", f"/inbox/threads/{reply_id}/mark-read")) or {}
+
+    async def mark_all_read(self, *, category: Optional[str] = None) -> dict:
+        """Mark every unread thread read, optionally only one category. Returns ``{"updated": n}``."""
+        body = {"category": category} if category else {}
+        return _unwrap(await self._http.request("POST", "/inbox/mark-all-read", json_body=body)) or {}
+
+    async def bulk_update(
+        self,
+        ids: List[str],
+        *,
+        is_read: Optional[bool] = None,
+        is_starred: Optional[bool] = None,
+        category: Optional[str] = None,
+    ) -> dict:
+        """Update up to 100 threads at once. Returns ``{"updated": n}``."""
+        body = _bulk_body(ids, is_read, is_starred, category)
+        return _unwrap(await self._http.request("POST", "/inbox/threads/bulk-update", json_body=body)) or {}
+
+    async def bulk_delete(self, ids: List[str]) -> dict:
+        """Delete up to 100 threads at once. Returns ``{"deleted": n}``."""
+        return _unwrap(await self._http.request("POST", "/inbox/threads/bulk-delete", json_body={"ids": ids})) or {}
+
+    async def list_notes(self, reply_id: str) -> list:
+        return _unwrap(await self._http.request("GET", f"/inbox/threads/{reply_id}/notes")) or []
+
+    async def add_note(self, reply_id: str, content: str) -> dict:
+        """Add an internal note. It is credited to the user who owns the API key."""
+        return _unwrap(await self._http.request(
+            "POST", f"/inbox/threads/{reply_id}/notes", json_body={"content": content}
+        )) or {}
+
+    async def delete_note(self, note_id: str) -> dict:
+        return _unwrap(await self._http.request("DELETE", f"/inbox/notes/{note_id}")) or {}
+
+    async def list_sent(
+        self,
+        *,
+        page: int = 1,
+        page_size: int = 50,
+        campaign_id: Optional[str] = None,
+        account_id: Optional[str] = None,
+        email_type: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> AsyncPaginatedResponse[dict]:
+        params: Dict[str, Any] = {
+            "page": page, "pageSize": page_size, "campaignId": campaign_id,
+            "accountId": account_id, "emailType": email_type, "search": search,
+        }
+        return await _async_fetch_page(self._http, "/inbox/sent", params, lambda d: d)

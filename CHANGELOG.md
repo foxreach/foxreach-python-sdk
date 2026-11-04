@@ -1,5 +1,41 @@
 # Changelog
 
+## [Unreleased]
+
+## [0.6.0] - 2026-11-04
+
+Covers all 203 operations of the public API v1 (0.5.0 covered 90).
+
+### Added
+
+- `leads.bulk_delete`, `bulk_delete_impact`, `bulk_tag`, `bulk_untag`, `bulk_verify`, `export`, `download_export` and `variables` (sync and async): bulk lead actions by `lead_ids` or `filter` (each returns a `Job`), a CSV export job with a download, and the merge-tag list. `bulk_delete` is irreversible for campaign membership; `bulk_verify` spends verification credits.
+- `workspace` resource (`get`, `update`, `members`, `invite`, `update_member_role`, `remove_member`, `invites`, `revoke_invite`, `resend_invite`, `defaults`, `update_defaults`) and `api_keys` resource (`list`, `create`, `revoke`), sync and async. Team changes and API key management need a key with the new opt-in `admin` scope.
+- `webhooks.test(id)`, `webhooks.deliveries(id, status=...)` and the `events` resource (`events.list(type, start_date, end_date)`), sync and async: `POST /webhooks/{id}/test`, `GET /webhooks/{id}/deliveries`, `GET /events`.
+- `inbox.mark_read`, `mark_all_read`, `bulk_update`, `bulk_delete`, `list_notes`, `add_note`, `delete_note`, `list_sent` (sync and async): `/inbox/threads/{id}/mark-read`, `/inbox/mark-all-read`, `/inbox/threads/bulk-update`, `/inbox/threads/bulk-delete`, `/inbox/threads/{id}/notes`, `/inbox/notes/{id}`, `/inbox/sent`. Bulk calls take up to 100 ids.
+- `agency` resource (sync and async): `overview`, `list_clients`, `create_client`, `rename_client`, `delete_client`, `get_branding`, `update_branding` against `/agency/*`. Agency keys only; changes need a key created by the agency owner.
+- `audit_log.list(...)`: `GET /audit-log`, one page of who or what changed state, filtered by source, actor, time, campaign or account; pass `meta.next_cursor` as `cursor` for the next page.
+- `analytics`: `account`, `report`, `export_report` (CSV text), `leaderboard`, `activity`, `campaign_daily`, `campaign_steps`.
+- `lead_finder`: `create_list`, `get_list`, `rename_list`, `delete_list`, `list_items`, `add_items`, `remove_items`, `reveal_list` (spends reveal credits), `add_list_to_leads`, `export_list`, `create_saved_search`, `get_saved_search`, `update_saved_search`, `delete_saved_search`, `run_saved_search` (free).
+- `warmup`: `create_tag`, `update_tag`, `delete_tag`, `assign_tag`, `unassign_tag`.
+- `email_accounts`: `test_connection` (SMTP and IMAP probe, public mail hosts only) and `check_domain_auth`.
+- `templates`: `publish`, `unpublish`, `clone`.
+These methods return the API's `data` as a plain dict or list (keys in snake_case).
+
+- `FoxReach(workspace_id=...)` and `AsyncFoxReach(workspace_id=...)`: act as a client workspace of an Agency key (sends `X-Workspace-Id`).
+- `workspaces.list()` (sync and async): `GET /workspaces`, the workspaces the key can act as.
+- `client.me()` (sync and async): `GET /me`, the calling key, its workspace, the plan and limits, the rate limit and the credit balances. Returns `Me`.
+- `jobs.list(type=..., status=...)` and `jobs.get(job_id)` (sync and async): `GET /jobs` and `GET /jobs/{job_id}`, the status, progress and result counters of background jobs (lead imports, verification runs). Returns `Job`.
+- `block_list` resource (sync and async): `list`, `add`, `bulk_add`, `remove`, `bulk_remove`, `export` against `/block-list`. Types `BlockListEntry` and `BlockListBulkResult`.
+- `leads.bulk_import()` result gains `blocked` and `blocked_emails`: rows skipped because the address or domain is on the block list. `campaigns.add_leads()` returns `blocked` alongside `added` and `skipped`.
+
+- `campaigns.duplicate`, `share`, `unshare`, `preview`, `send_test_email`, `bulk_remove_leads`, `activity`, `cohorts`, `cohort_detail` and `lead_emails` (sync and async). `send_test_email` sends one real email; `bulk_remove_leads` takes up to 5,000 ids on a campaign that is not active.
+- A/B variants on sequence steps: `campaigns.sequences.list_variants`, `create_variant`, `update_variant`, `delete_variant` and `variant_stats` (sync and async), with the types `SequenceVariant`, `VariantCreate`, `VariantUpdate` and `VariantStats`. Variants cannot be added while the campaign is active.
+- `inbox.drafts` (sync and async): `list`, `get`, `update`, `send`, `regenerate`, `dismiss` for AI reply drafts. `send` sends the stored draft as a real email.
+- `lead_labels` resource (sync and async): `list`, `create`, `update`, `delete`, `assign`, `unassign`. Type `LeadLabel`; `Lead` gains `labels`, `interest_status`, `interest_status_source` and `interest_status_updated_at`.
+- `leads.set_interest_status(lead_id, status)` (sync and async): set or clear the interest status by hand; `LeadUpdate` gains `interest_status`.
+- `copy.judge` (free) and `copy.rewrite` (1 AI credit) (sync and async): `POST /copy/judge` and `POST /copy/rewrite`.
+- `webhooks.resume(id)` (sync and async): turn a webhook that was paused after 10 failed deliveries in a row back on. `Webhook` gains `paused_at` and `paused_reason`; `Webhook`, `WebhookCreate` and `WebhookUpdate` gain `reply_categories`.
+
 ## [0.5.0] - 2026-11-03
 
 ### Added

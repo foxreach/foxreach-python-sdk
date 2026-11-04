@@ -3,7 +3,10 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from ..types import Campaign, CampaignCreate, CampaignUpdate, Sequence, SequenceCreate, SequenceUpdate
+from ..types import (
+    Campaign, CampaignCreate, CampaignUpdate, Sequence, SequenceCreate, SequenceUpdate,
+    SequenceVariant, VariantCreate, VariantStats, VariantUpdate,
+)
 from .._pagination import (
     PaginatedResponse,
     AsyncPaginatedResponse,
@@ -57,6 +60,37 @@ def _make_sequence(data: dict) -> Sequence:
     )
 
 
+def _make_variant(data: dict) -> SequenceVariant:
+    return SequenceVariant(
+        id=data.get("id", ""),
+        sequence_id=data.get("sequence_id", data.get("sequenceId", "")),
+        label=data.get("label", ""),
+        subject=data.get("subject", ""),
+        body=data.get("body", ""),
+        weight=data.get("weight", 1),
+        send_as_html=data.get("send_as_html", data.get("sendAsHtml", False)),
+        created_at=data.get("created_at", data.get("createdAt")),
+        updated_at=data.get("updated_at", data.get("updatedAt")),
+    )
+
+
+def _make_variant_stats(data: dict) -> VariantStats:
+    return VariantStats(
+        variant_id=data.get("variant_id", data.get("variantId", "")),
+        label=data.get("label", ""),
+        sent=data.get("sent", 0),
+        opened=data.get("opened", 0),
+        replied=data.get("replied", 0),
+        bounced=data.get("bounced", 0),
+        open_rate=data.get("open_rate", data.get("openRate", 0.0)),
+        reply_rate=data.get("reply_rate", data.get("replyRate", 0.0)),
+    )
+
+
+def _variant_body(data: Any) -> Dict[str, Any]:
+    return {k: v for k, v in asdict(data).items() if v is not None}
+
+
 def _unwrap(result: Any) -> Any:
     if isinstance(result, dict) and "data" in result:
         return result["data"]
@@ -95,6 +129,36 @@ class SequencesResource:
     def delete(self, campaign_id: str, sequence_id: str) -> None:
         self._http.request("DELETE", f"/campaigns/{campaign_id}/sequences/{sequence_id}")
 
+    def list_variants(self, campaign_id: str, sequence_id: str) -> List[SequenceVariant]:
+        """A/B variants of a step, ordered by label."""
+        result = self._http.request("GET", f"/campaigns/{campaign_id}/sequences/{sequence_id}/variants")
+        items = _unwrap(result)
+        return [_make_variant(d) for d in items] if isinstance(items, list) else []
+
+    def create_variant(self, campaign_id: str, sequence_id: str, data: VariantCreate) -> SequenceVariant:
+        """Add a variant. Not allowed while the campaign is active."""
+        result = self._http.request(
+            "POST", f"/campaigns/{campaign_id}/sequences/{sequence_id}/variants", json_body=_variant_body(data),
+        )
+        return _make_variant(_unwrap(result))
+
+    def update_variant(self, campaign_id: str, sequence_id: str, variant_id: str, data: VariantUpdate) -> SequenceVariant:
+        result = self._http.request(
+            "PATCH", f"/campaigns/{campaign_id}/sequences/{sequence_id}/variants/{variant_id}",
+            json_body=_variant_body(data),
+        )
+        return _make_variant(_unwrap(result))
+
+    def delete_variant(self, campaign_id: str, sequence_id: str, variant_id: str) -> None:
+        """Delete a variant. With two variants on the step, the other is deleted too."""
+        self._http.request("DELETE", f"/campaigns/{campaign_id}/sequences/{sequence_id}/variants/{variant_id}")
+
+    def variant_stats(self, campaign_id: str, sequence_id: str) -> List[VariantStats]:
+        """Sent, opened, replied and bounced per variant; empty when the step has none."""
+        result = self._http.request("GET", f"/campaigns/{campaign_id}/sequences/{sequence_id}/variant-stats")
+        items = _unwrap(result)
+        return [_make_variant_stats(d) for d in items] if isinstance(items, list) else []
+
 
 class AsyncSequencesResource:
     def __init__(self, http: AsyncHttpClient) -> None:
@@ -123,6 +187,36 @@ class AsyncSequencesResource:
 
     async def delete(self, campaign_id: str, sequence_id: str) -> None:
         await self._http.request("DELETE", f"/campaigns/{campaign_id}/sequences/{sequence_id}")
+
+    async def list_variants(self, campaign_id: str, sequence_id: str) -> List[SequenceVariant]:
+        """A/B variants of a step, ordered by label."""
+        result = await self._http.request("GET", f"/campaigns/{campaign_id}/sequences/{sequence_id}/variants")
+        items = _unwrap(result)
+        return [_make_variant(d) for d in items] if isinstance(items, list) else []
+
+    async def create_variant(self, campaign_id: str, sequence_id: str, data: VariantCreate) -> SequenceVariant:
+        """Add a variant. Not allowed while the campaign is active."""
+        result = await self._http.request(
+            "POST", f"/campaigns/{campaign_id}/sequences/{sequence_id}/variants", json_body=_variant_body(data),
+        )
+        return _make_variant(_unwrap(result))
+
+    async def update_variant(self, campaign_id: str, sequence_id: str, variant_id: str, data: VariantUpdate) -> SequenceVariant:
+        result = await self._http.request(
+            "PATCH", f"/campaigns/{campaign_id}/sequences/{sequence_id}/variants/{variant_id}",
+            json_body=_variant_body(data),
+        )
+        return _make_variant(_unwrap(result))
+
+    async def delete_variant(self, campaign_id: str, sequence_id: str, variant_id: str) -> None:
+        """Delete a variant. With two variants on the step, the other is deleted too."""
+        await self._http.request("DELETE", f"/campaigns/{campaign_id}/sequences/{sequence_id}/variants/{variant_id}")
+
+    async def variant_stats(self, campaign_id: str, sequence_id: str) -> List[VariantStats]:
+        """Sent, opened, replied and bounced per variant; empty when the step has none."""
+        result = await self._http.request("GET", f"/campaigns/{campaign_id}/sequences/{sequence_id}/variant-stats")
+        items = _unwrap(result)
+        return [_make_variant_stats(d) for d in items] if isinstance(items, list) else []
 
 
 # ---------------------------------------------------------------------------
@@ -222,6 +316,102 @@ class CampaignsResource:
         result = self._http.request("GET", f"/campaigns/{campaign_id}/accounts")
         return result if isinstance(result, dict) else {}
 
+    def duplicate(self, campaign_id: str) -> Campaign:
+        """Copy settings, steps, A/B variants and sending accounts into a new draft named "<name> (Copy)". Leads are not copied."""
+        result = self._http.request("POST", f"/campaigns/{campaign_id}/duplicate")
+        return _make_campaign(_unwrap(result))
+
+    def share(self, campaign_id: str) -> Dict[str, Any]:
+        """Turn on the public report page. Returns ``share_slug`` and ``share_url``. Anyone with the link sees the campaign name, its totals and rates, not leads or copy."""
+        result = self._http.request("POST", f"/campaigns/{campaign_id}/share")
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    def unshare(self, campaign_id: str) -> Dict[str, Any]:
+        """Turn the public report page off. The old link stops working."""
+        result = self._http.request("DELETE", f"/campaigns/{campaign_id}/share")
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    def preview(self, campaign_id: str, subject: str, body: str, *, lead_id: Optional[str] = None) -> Dict[str, Any]:
+        """Render a subject and body with spin syntax and merge tags filled in. Sends nothing."""
+        payload: Dict[str, Any] = {"subject": subject, "body": body}
+        if lead_id is not None:
+            payload["lead_id"] = lead_id
+        result = self._http.request("POST", f"/campaigns/{campaign_id}/preview", json_body=payload)
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    def send_test_email(
+        self,
+        campaign_id: str,
+        *,
+        to_email: str,
+        account_id: str,
+        subject: str,
+        body: str,
+        is_html: bool = False,
+        preheader: Optional[str] = None,
+        lead_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Send one REAL email through one of the campaign's accounts to ``to_email``.
+        It counts against the account's daily and the workspace's monthly send
+        limits. Returns ``success``, ``message_id`` and ``error``."""
+        payload: Dict[str, Any] = {
+            "to_email": to_email, "account_id": account_id, "subject": subject, "body": body, "is_html": is_html,
+        }
+        if preheader is not None:
+            payload["preheader"] = preheader
+        if lead_id is not None:
+            payload["lead_id"] = lead_id
+        result = self._http.request("POST", f"/campaigns/{campaign_id}/test-email", json_body=payload)
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    def bulk_remove_leads(self, campaign_id: str, lead_ids: List[str]) -> Dict[str, Any]:
+        """Remove up to 5,000 leads from a campaign that is not active. Returns ``removed``."""
+        result = self._http.request(
+            "POST", f"/campaigns/{campaign_id}/leads/bulk-remove", json_body={"lead_ids": lead_ids},
+        )
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    def activity(
+        self,
+        campaign_id: str,
+        *,
+        type: Optional[str] = None,
+        account_id: Optional[str] = None,
+        step: Optional[str] = None,
+        search: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        sort_order: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> Dict[str, Any]:
+        """Summary, 30-day sparkline, pause or block reason and a paginated event feed."""
+        raw = {
+            "type": type, "accountId": account_id, "step": step, "search": search, "startDate": start_date,
+            "endDate": end_date, "sortBy": sort_by, "sortOrder": sort_order, "page": page, "pageSize": page_size,
+        }
+        params = {k: v for k, v in raw.items() if v is not None}
+        result = self._http.request("GET", f"/campaigns/{campaign_id}/activity", params=params)
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    def cohorts(self, campaign_id: str, *, days: int = 30) -> List[Dict[str, Any]]:
+        """Sent, opened, replied, bounced and unique leads per UTC day for the last 1 to 90 days."""
+        result = self._http.request("GET", f"/campaigns/{campaign_id}/cohorts", params={"days": days})
+        data = _unwrap(result) if isinstance(result, dict) else []
+        return data if isinstance(data, list) else []
+
+    def cohort_detail(self, campaign_id: str, date: str) -> Dict[str, Any]:
+        """Emails and replies of one UTC day (``YYYY-MM-DD``). Each side is cut at 200 rows."""
+        result = self._http.request("GET", f"/campaigns/{campaign_id}/cohorts/{date}")
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    def lead_emails(self, campaign_id: str, lead_id: str) -> List[Dict[str, Any]]:
+        """The newest 20 emails and replies for one lead in this campaign."""
+        result = self._http.request("GET", f"/campaigns/{campaign_id}/leads/{lead_id}/emails")
+        data = _unwrap(result) if isinstance(result, dict) else []
+        return data if isinstance(data, list) else []
+
     def get_esp_mix(self, campaign_id: str) -> Dict[str, Any]:
         result = self._http.request("GET", f"/campaigns/{campaign_id}/esp-mix")
         return result if isinstance(result, dict) else {}
@@ -319,6 +509,102 @@ class AsyncCampaignsResource:
     async def list_accounts(self, campaign_id: str) -> Dict[str, Any]:
         result = await self._http.request("GET", f"/campaigns/{campaign_id}/accounts")
         return result if isinstance(result, dict) else {}
+
+    async def duplicate(self, campaign_id: str) -> Campaign:
+        """Copy settings, steps, A/B variants and sending accounts into a new draft named "<name> (Copy)". Leads are not copied."""
+        result = await self._http.request("POST", f"/campaigns/{campaign_id}/duplicate")
+        return _make_campaign(_unwrap(result))
+
+    async def share(self, campaign_id: str) -> Dict[str, Any]:
+        """Turn on the public report page. Returns ``share_slug`` and ``share_url``. Anyone with the link sees the campaign name, its totals and rates, not leads or copy."""
+        result = await self._http.request("POST", f"/campaigns/{campaign_id}/share")
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    async def unshare(self, campaign_id: str) -> Dict[str, Any]:
+        """Turn the public report page off. The old link stops working."""
+        result = await self._http.request("DELETE", f"/campaigns/{campaign_id}/share")
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    async def preview(self, campaign_id: str, subject: str, body: str, *, lead_id: Optional[str] = None) -> Dict[str, Any]:
+        """Render a subject and body with spin syntax and merge tags filled in. Sends nothing."""
+        payload: Dict[str, Any] = {"subject": subject, "body": body}
+        if lead_id is not None:
+            payload["lead_id"] = lead_id
+        result = await self._http.request("POST", f"/campaigns/{campaign_id}/preview", json_body=payload)
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    async def send_test_email(
+        self,
+        campaign_id: str,
+        *,
+        to_email: str,
+        account_id: str,
+        subject: str,
+        body: str,
+        is_html: bool = False,
+        preheader: Optional[str] = None,
+        lead_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Send one REAL email through one of the campaign's accounts to ``to_email``.
+        It counts against the account's daily and the workspace's monthly send
+        limits. Returns ``success``, ``message_id`` and ``error``."""
+        payload: Dict[str, Any] = {
+            "to_email": to_email, "account_id": account_id, "subject": subject, "body": body, "is_html": is_html,
+        }
+        if preheader is not None:
+            payload["preheader"] = preheader
+        if lead_id is not None:
+            payload["lead_id"] = lead_id
+        result = await self._http.request("POST", f"/campaigns/{campaign_id}/test-email", json_body=payload)
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    async def bulk_remove_leads(self, campaign_id: str, lead_ids: List[str]) -> Dict[str, Any]:
+        """Remove up to 5,000 leads from a campaign that is not active. Returns ``removed``."""
+        result = await self._http.request(
+            "POST", f"/campaigns/{campaign_id}/leads/bulk-remove", json_body={"lead_ids": lead_ids},
+        )
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    async def activity(
+        self,
+        campaign_id: str,
+        *,
+        type: Optional[str] = None,
+        account_id: Optional[str] = None,
+        step: Optional[str] = None,
+        search: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        sort_order: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> Dict[str, Any]:
+        """Summary, 30-day sparkline, pause or block reason and a paginated event feed."""
+        raw = {
+            "type": type, "accountId": account_id, "step": step, "search": search, "startDate": start_date,
+            "endDate": end_date, "sortBy": sort_by, "sortOrder": sort_order, "page": page, "pageSize": page_size,
+        }
+        params = {k: v for k, v in raw.items() if v is not None}
+        result = await self._http.request("GET", f"/campaigns/{campaign_id}/activity", params=params)
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    async def cohorts(self, campaign_id: str, *, days: int = 30) -> List[Dict[str, Any]]:
+        """Sent, opened, replied, bounced and unique leads per UTC day for the last 1 to 90 days."""
+        result = await self._http.request("GET", f"/campaigns/{campaign_id}/cohorts", params={"days": days})
+        data = _unwrap(result) if isinstance(result, dict) else []
+        return data if isinstance(data, list) else []
+
+    async def cohort_detail(self, campaign_id: str, date: str) -> Dict[str, Any]:
+        """Emails and replies of one UTC day (``YYYY-MM-DD``). Each side is cut at 200 rows."""
+        result = await self._http.request("GET", f"/campaigns/{campaign_id}/cohorts/{date}")
+        return _unwrap(result) if isinstance(result, dict) else {}
+
+    async def lead_emails(self, campaign_id: str, lead_id: str) -> List[Dict[str, Any]]:
+        """The newest 20 emails and replies for one lead in this campaign."""
+        result = await self._http.request("GET", f"/campaigns/{campaign_id}/leads/{lead_id}/emails")
+        data = _unwrap(result) if isinstance(result, dict) else []
+        return data if isinstance(data, list) else []
 
     async def get_esp_mix(self, campaign_id: str) -> Dict[str, Any]:
         result = await self._http.request("GET", f"/campaigns/{campaign_id}/esp-mix")

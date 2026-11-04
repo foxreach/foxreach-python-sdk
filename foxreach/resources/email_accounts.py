@@ -121,6 +121,17 @@ class EmailAccountsResource:
         result = self._http.request("POST", "/email-accounts/google-oauth/start")
         return _unwrap(result) if isinstance(result, dict) else {}
 
+    def test_connection(self, email: Any, password: Any, smtp_host: Any, imap_host: Any, *, smtp_port: Any = None, imap_port: Any = None) -> Any:
+        """Check SMTP and IMAP login for a mailbox without saving anything. The password goes to the mail provider only. Requires write scope."""
+        body = {k: v for k, v in {"email": email, "password": password, "smtp_host": smtp_host, "imap_host": imap_host, "smtp_port": smtp_port, "imap_port": imap_port}.items() if v is not None}
+        result = self._http.request("POST", "/email-accounts/test", json_body=body)
+        return _pa3_data(result)
+
+    def check_domain_auth(self, account_id: Any) -> Any:
+        """Run a fresh SPF, DKIM and DMARC check for an account's sending domain. Requires write scope."""
+        result = self._http.request("POST", f"/email-accounts/{account_id}/domain-auth/check", json_body={})
+        return _pa3_data(result)
+
 
 class AsyncEmailAccountsResource:
     def __init__(self, http: AsyncHttpClient) -> None:
@@ -192,3 +203,20 @@ class AsyncEmailAccountsResource:
         """
         result = await self._http.request("POST", "/email-accounts/google-oauth/start")
         return _unwrap(result) if isinstance(result, dict) else {}
+
+    async def test_connection(self, email: Any, password: Any, smtp_host: Any, imap_host: Any, *, smtp_port: Any = None, imap_port: Any = None) -> Any:
+        """Check SMTP and IMAP login for a mailbox without saving anything. The password goes to the mail provider only. Requires write scope."""
+        body = {k: v for k, v in {"email": email, "password": password, "smtp_host": smtp_host, "imap_host": imap_host, "smtp_port": smtp_port, "imap_port": imap_port}.items() if v is not None}
+        result = await self._http.request("POST", "/email-accounts/test", json_body=body)
+        return _pa3_data(result)
+
+    async def check_domain_auth(self, account_id: Any) -> Any:
+        """Run a fresh SPF, DKIM and DMARC check for an account's sending domain. Requires write scope."""
+        result = await self._http.request("POST", f"/email-accounts/{account_id}/domain-auth/check", json_body={})
+        return _pa3_data(result)
+
+
+def _pa3_data(result: Any) -> Any:
+    if isinstance(result, dict) and "data" in result and "meta" not in result:
+        return result["data"]
+    return result

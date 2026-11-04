@@ -187,6 +187,89 @@ class LeadFinderResource:
         items = data.get("savedSearches", data.get("saved_searches", [])) if isinstance(data, dict) else []
         return [_make_saved_search(i) for i in items]
 
+    def create_list(self, name: Any, kind: Any) -> Any:
+        """Create an empty people or companies list. Requires write scope."""
+        body = {k: v for k, v in {"name": name, "kind": kind}.items() if v is not None}
+        result = self._http.request("POST", "/lead-finder/lists", json_body=body)
+        return _pa3_data(result)
+
+    def get_list(self, list_id: Any) -> Any:
+        """Read one list with its item count. Requires read scope."""
+        result = self._http.request("GET", f"/lead-finder/lists/{list_id}")
+        return _pa3_data(result)
+
+    def rename_list(self, list_id: Any, name: Any) -> Any:
+        """Rename a list. Requires write scope."""
+        body = {k: v for k, v in {"name": name}.items() if v is not None}
+        result = self._http.request("PATCH", f"/lead-finder/lists/{list_id}", json_body=body)
+        return _pa3_data(result)
+
+    def delete_list(self, list_id: Any) -> Any:
+        """Delete a list and its items. Reveals and leads already created stay. Requires write scope."""
+        result = self._http.request("DELETE", f"/lead-finder/lists/{list_id}")
+        return _pa3_data(result)
+
+    def list_items(self, list_id: Any, *, page: Any = None, page_size: Any = None) -> Any:
+        """One page of a list's items with reveal status and lead link (page size 1 to 100). Requires read scope."""
+        params = {k: v for k, v in {"page": page, "pageSize": page_size}.items() if v is not None}
+        result = self._http.request("GET", f"/lead-finder/lists/{list_id}/items", params=params)
+        return result if isinstance(result, dict) else {}
+
+    def add_items(self, list_id: Any, items: Any) -> Any:
+        """Save up to 200 people or companies, each {key, snapshot}. Requires write scope."""
+        body = {k: v for k, v in {"items": items}.items() if v is not None}
+        result = self._http.request("POST", f"/lead-finder/lists/{list_id}/items", json_body=body)
+        return _pa3_data(result)
+
+    def remove_items(self, list_id: Any, keys: Any) -> Any:
+        """Remove up to 5,000 items by key. Requires write scope."""
+        body = {k: v for k, v in {"keys": keys}.items() if v is not None}
+        result = self._http.request("DELETE", f"/lead-finder/lists/{list_id}/items", json_body=body)
+        return _pa3_data(result)
+
+    def reveal_list(self, list_id: Any, keys: Any, *, campaign_id: Any = None) -> Any:
+        """Reveal work emails for up to 100 people in a list. SPENDS REVEAL CREDITS, one per newly looked-up person. Requires write scope."""
+        body = {k: v for k, v in {"keys": keys, "campaign_id": campaign_id}.items() if v is not None}
+        result = self._http.request("POST", f"/lead-finder/lists/{list_id}/reveal", json_body=body)
+        return _pa3_data(result)
+
+    def add_list_to_leads(self, list_id: Any, *, keys: Any = None, campaign_id: Any = None) -> Any:
+        """Add the revealed people of a list to Leads. Free; counts toward the contact limit. Requires write scope."""
+        body = {k: v for k, v in {"keys": keys, "campaign_id": campaign_id}.items() if v is not None}
+        result = self._http.request("POST", f"/lead-finder/lists/{list_id}/add-to-leads", json_body=body)
+        return _pa3_data(result)
+
+    def export_list(self, list_id: Any) -> Any:
+        """Download a list as CSV text (at most 5,000 rows). Requires read scope."""
+        return self._http.request_text("GET", f"/lead-finder/lists/{list_id}/export")
+
+    def create_saved_search(self, name: Any, kind: Any, *, filters: Any = None) -> Any:
+        """Store a set of filters to re-run later. Requires write scope."""
+        body = {k: v for k, v in {"name": name, "kind": kind, "filters": filters}.items() if v is not None}
+        result = self._http.request("POST", "/lead-finder/saved-searches", json_body=body)
+        return _pa3_data(result)
+
+    def get_saved_search(self, saved_search_id: Any) -> Any:
+        """Read one saved search. Requires read scope."""
+        result = self._http.request("GET", f"/lead-finder/saved-searches/{saved_search_id}")
+        return _pa3_data(result)
+
+    def update_saved_search(self, saved_search_id: Any, *, name: Any = None, alert_enabled: Any = None) -> Any:
+        """Rename a saved search or switch its alert. Requires write scope."""
+        body = {k: v for k, v in {"name": name, "alert_enabled": alert_enabled}.items() if v is not None}
+        result = self._http.request("PATCH", f"/lead-finder/saved-searches/{saved_search_id}", json_body=body)
+        return _pa3_data(result)
+
+    def delete_saved_search(self, saved_search_id: Any) -> Any:
+        """Delete a saved search. Requires write scope."""
+        result = self._http.request("DELETE", f"/lead-finder/saved-searches/{saved_search_id}")
+        return _pa3_data(result)
+
+    def run_saved_search(self, saved_search_id: Any) -> Any:
+        """Count the current matches of a saved search. Free: no reveal credits or search budget. Requires write scope."""
+        result = self._http.request("POST", f"/lead-finder/saved-searches/{saved_search_id}/run", json_body={})
+        return _pa3_data(result)
+
 
 class AsyncLeadFinderResource:
     def __init__(self, http: AsyncHttpClient) -> None:
@@ -309,3 +392,92 @@ class AsyncLeadFinderResource:
         data = _unwrap(result) if isinstance(result, dict) else {}
         items = data.get("savedSearches", data.get("saved_searches", [])) if isinstance(data, dict) else []
         return [_make_saved_search(i) for i in items]
+
+    async def create_list(self, name: Any, kind: Any) -> Any:
+        """Create an empty people or companies list. Requires write scope."""
+        body = {k: v for k, v in {"name": name, "kind": kind}.items() if v is not None}
+        result = await self._http.request("POST", "/lead-finder/lists", json_body=body)
+        return _pa3_data(result)
+
+    async def get_list(self, list_id: Any) -> Any:
+        """Read one list with its item count. Requires read scope."""
+        result = await self._http.request("GET", f"/lead-finder/lists/{list_id}")
+        return _pa3_data(result)
+
+    async def rename_list(self, list_id: Any, name: Any) -> Any:
+        """Rename a list. Requires write scope."""
+        body = {k: v for k, v in {"name": name}.items() if v is not None}
+        result = await self._http.request("PATCH", f"/lead-finder/lists/{list_id}", json_body=body)
+        return _pa3_data(result)
+
+    async def delete_list(self, list_id: Any) -> Any:
+        """Delete a list and its items. Reveals and leads already created stay. Requires write scope."""
+        result = await self._http.request("DELETE", f"/lead-finder/lists/{list_id}")
+        return _pa3_data(result)
+
+    async def list_items(self, list_id: Any, *, page: Any = None, page_size: Any = None) -> Any:
+        """One page of a list's items with reveal status and lead link (page size 1 to 100). Requires read scope."""
+        params = {k: v for k, v in {"page": page, "pageSize": page_size}.items() if v is not None}
+        result = await self._http.request("GET", f"/lead-finder/lists/{list_id}/items", params=params)
+        return result if isinstance(result, dict) else {}
+
+    async def add_items(self, list_id: Any, items: Any) -> Any:
+        """Save up to 200 people or companies, each {key, snapshot}. Requires write scope."""
+        body = {k: v for k, v in {"items": items}.items() if v is not None}
+        result = await self._http.request("POST", f"/lead-finder/lists/{list_id}/items", json_body=body)
+        return _pa3_data(result)
+
+    async def remove_items(self, list_id: Any, keys: Any) -> Any:
+        """Remove up to 5,000 items by key. Requires write scope."""
+        body = {k: v for k, v in {"keys": keys}.items() if v is not None}
+        result = await self._http.request("DELETE", f"/lead-finder/lists/{list_id}/items", json_body=body)
+        return _pa3_data(result)
+
+    async def reveal_list(self, list_id: Any, keys: Any, *, campaign_id: Any = None) -> Any:
+        """Reveal work emails for up to 100 people in a list. SPENDS REVEAL CREDITS, one per newly looked-up person. Requires write scope."""
+        body = {k: v for k, v in {"keys": keys, "campaign_id": campaign_id}.items() if v is not None}
+        result = await self._http.request("POST", f"/lead-finder/lists/{list_id}/reveal", json_body=body)
+        return _pa3_data(result)
+
+    async def add_list_to_leads(self, list_id: Any, *, keys: Any = None, campaign_id: Any = None) -> Any:
+        """Add the revealed people of a list to Leads. Free; counts toward the contact limit. Requires write scope."""
+        body = {k: v for k, v in {"keys": keys, "campaign_id": campaign_id}.items() if v is not None}
+        result = await self._http.request("POST", f"/lead-finder/lists/{list_id}/add-to-leads", json_body=body)
+        return _pa3_data(result)
+
+    async def export_list(self, list_id: Any) -> Any:
+        """Download a list as CSV text (at most 5,000 rows). Requires read scope."""
+        return await self._http.request_text("GET", f"/lead-finder/lists/{list_id}/export")
+
+    async def create_saved_search(self, name: Any, kind: Any, *, filters: Any = None) -> Any:
+        """Store a set of filters to re-run later. Requires write scope."""
+        body = {k: v for k, v in {"name": name, "kind": kind, "filters": filters}.items() if v is not None}
+        result = await self._http.request("POST", "/lead-finder/saved-searches", json_body=body)
+        return _pa3_data(result)
+
+    async def get_saved_search(self, saved_search_id: Any) -> Any:
+        """Read one saved search. Requires read scope."""
+        result = await self._http.request("GET", f"/lead-finder/saved-searches/{saved_search_id}")
+        return _pa3_data(result)
+
+    async def update_saved_search(self, saved_search_id: Any, *, name: Any = None, alert_enabled: Any = None) -> Any:
+        """Rename a saved search or switch its alert. Requires write scope."""
+        body = {k: v for k, v in {"name": name, "alert_enabled": alert_enabled}.items() if v is not None}
+        result = await self._http.request("PATCH", f"/lead-finder/saved-searches/{saved_search_id}", json_body=body)
+        return _pa3_data(result)
+
+    async def delete_saved_search(self, saved_search_id: Any) -> Any:
+        """Delete a saved search. Requires write scope."""
+        result = await self._http.request("DELETE", f"/lead-finder/saved-searches/{saved_search_id}")
+        return _pa3_data(result)
+
+    async def run_saved_search(self, saved_search_id: Any) -> Any:
+        """Count the current matches of a saved search. Free: no reveal credits or search budget. Requires write scope."""
+        result = await self._http.request("POST", f"/lead-finder/saved-searches/{saved_search_id}/run", json_body={})
+        return _pa3_data(result)
+
+
+def _pa3_data(result: Any) -> Any:
+    if isinstance(result, dict) and "data" in result and "meta" not in result:
+        return result["data"]
+    return result

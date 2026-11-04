@@ -267,11 +267,56 @@ def test_pyproject_version_matches_dunder_version():
     with open(path) as fh:
         match = re.search(r'^version\s*=\s*"([^"]+)"', fh.read(), re.MULTILINE)
     assert match is not None
-    assert match.group(1) == __version__ == "0.5.0"
+    assert match.group(1) == __version__ == "0.6.0"
 
 
 @respx.mock
 def test_user_agent_carries_version():
     route = respx.get(f"{BASE}/leads").mock(return_value=httpx.Response(200, json=PAGE))
     _client().leads.list()
-    assert route.calls.last.request.headers["User-Agent"] == "foxreach-python/0.5.0"
+    assert route.calls.last.request.headers["User-Agent"] == "foxreach-python/0.6.0"
+
+
+@respx.mock
+def test_leads_list_interest_and_label_filters_and_parsing():
+    route = respx.get(f"{BASE}/leads").mock(return_value=httpx.Response(200, json={
+        "data": [{"id": "l1", "email": "a@b.co", "interestStatus": "interested",
+                  "interestStatusSource": "auto", "labels": [{"id": "x", "name": "Hot", "color": "success", "meaning": "positive"}]}],
+        "meta": {"total": 1, "page": 1, "pageSize": 50, "totalPages": 1},
+    }))
+    page = _client().leads.list(interest_status="interested", label_id="x")
+    q = route.calls[0].request.url.params
+    assert q["interestStatus"] == "interested" and q["labelId"] == "x"
+    lead = page.data[0]
+    assert lead.interest_status == "interested" and lead.labels[0].name == "Hot"
+
+
+@respx.mock
+def test_set_interest_status_sends_explicit_null_to_clear():
+    route = respx.patch(f"{BASE}/leads/l1").mock(return_value=httpx.Response(200, json={"data": {"id": "l1", "email": "a@b.co"}}))
+    _client().leads.set_interest_status("l1", None)
+    assert _body(route) == {"interestStatus": None}
+
+
+@respx.mock
+def test_lead_labels_requests():
+    create = respx.post(f"{BASE}/lead-labels").mock(return_value=httpx.Response(201, json={"data": {"id": "x", "name": "Hot"}}))
+    assign = respx.post(f"{BASE}/leads/l1/labels/x").mock(return_value=httpx.Response(204))
+    unassign = respx.delete(f"{BASE}/leads/l1/labels/x").mock(return_value=httpx.Response(204))
+    c = _client()
+    assert c.lead_labels.create("Hot", color="success", meaning="positive").id == "x"
+    assert _body(create) == {"name": "Hot", "color": "success", "meaning": "positive"}
+    c.lead_labels.assign("l1", "x")
+    c.lead_labels.unassign("l1", "x")
+    assert assign.called and unassign.called
+
+
+@respx.mock
+def test_webhook_resume_and_reply_categories():
+    resume = respx.post(f"{BASE}/webhooks/w1/resume").mock(return_value=httpx.Response(200, json={"data": {"id": "w1", "url": "u", "isActive": True, "pausedAt": None}}))
+    create = respx.post(f"{BASE}/webhooks").mock(return_value=httpx.Response(200, json={"data": {"id": "w2", "url": "u", "replyCategories": ["interested"]}}))
+    from foxreach.types import WebhookCreate
+    c = _client()
+    assert c.webhooks.resume("w1").is_active is True and resume.called
+    hook = c.webhooks.create(WebhookCreate(url="u", events=["*"], reply_categories=["interested"]))
+    assert _body(create)["replyCategories"] == ["interested"] and hook.reply_categories == ["interested"]
